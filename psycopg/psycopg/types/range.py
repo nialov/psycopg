@@ -15,7 +15,7 @@ from .. import _oids
 from .. import errors as e
 from .. import postgres
 from ..pq import Format
-from ..abc import AdaptContext, Buffer, Dumper, DumperKey, Query
+from ..abc import AdaptContext, Buffer, Dumper, DumperKey, DumpFunc, Query
 from ..adapt import RecursiveDumper, RecursiveLoader, PyFormat
 from .._oids import INVALID_OID, TEXT_OID
 from .._compat import cache
@@ -364,7 +364,7 @@ class RangeDumper(BaseRangeDumper):
         return dump_range_text(obj, dump)
 
 
-def dump_range_text(obj: Range[Any], dump: Callable[[Any], Buffer]) -> Buffer:
+def dump_range_text(obj: Range[Any], dump: DumpFunc) -> Buffer:
     if obj.isempty:
         return b"empty"
 
@@ -409,7 +409,7 @@ class RangeBinaryDumper(BaseRangeDumper):
         return dump_range_binary(obj, dump)
 
 
-def dump_range_binary(obj: Range[Any], dump: Callable[[Any], Buffer]) -> Buffer:
+def dump_range_binary(obj: Range[Any], dump: DumpFunc) -> Buffer:
     if not obj:
         return _EMPTY_HEAD
 
@@ -423,15 +423,21 @@ def dump_range_binary(obj: Range[Any], dump: Callable[[Any], Buffer]) -> Buffer:
 
     if obj.lower is not None:
         data = dump(obj.lower)
-        out += pack_len(len(data))
-        out += data
+        if data is not None:
+            out += pack_len(len(data))
+            out += data
+        else:
+            head |= RANGE_LB_INF
     else:
         head |= RANGE_LB_INF
 
     if obj.upper is not None:
         data = dump(obj.upper)
-        out += pack_len(len(data))
-        out += data
+        if data is not None:
+            out += pack_len(len(data))
+            out += data
+        else:
+            head |= RANGE_UB_INF
     else:
         head |= RANGE_UB_INF
 
